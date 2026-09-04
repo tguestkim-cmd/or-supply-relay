@@ -1,0 +1,1090 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>OR Supply Relay</title>
+<style>
+  :root {
+    --bg: #101619;
+    --surface: #192327;
+    --surface-2: #212E33;
+    --line: #2C3B41;
+    --ink: #E9F0F1;
+    --ink-dim: #8CA3AA;
+    --drape: #2F8078;
+    --now: #E0473C;
+    --next: #DE9B2E;
+    --stock: #5C7F8B;
+    --tap: 52px;
+  }
+  :root[data-theme="light"] {
+    --bg: #EEF3F4;
+    --surface: #FFFFFF;
+    --surface-2: #E3EBED;
+    --line: #CFDBDE;
+    --ink: #16252A;
+    --ink-dim: #5B7178;
+    --drape: #1F6B63;
+    --now: #C4362B;
+    --next: #B87715;
+    --stock: #547985;
+  }
+  :root[data-theme="light"] .urg.next,
+  :root[data-theme="light"] .urg.stock { color: #fff; }
+  :root[data-theme="light"] .item:active { background: var(--surface-2); }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%;
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px; line-height: 1.35;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { display: flex; flex-direction: column; }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+  .num { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+  /* ---------- top bar ---------- */
+  header {
+    padding: 10px 14px;
+    padding-top: calc(10px + env(safe-area-inset-top));
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .bar { display: flex; align-items: center; gap: 12px; }
+  .roles { display: flex; background: var(--bg); border-radius: 8px; padding: 3px; gap: 3px; }
+  .roles button {
+    padding: 8px 14px; border-radius: 6px; font-weight: 600; font-size: 14px;
+    color: var(--ink-dim);
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .roles button[aria-pressed="true"] { background: var(--drape); color: #fff; }
+  /* Count of unclaimed requests waiting in the tech's zone.
+     Colour tracks the most urgent one on the board. */
+  .badge {
+    min-width: 21px; height: 21px; padding: 0 6px; border-radius: 11px;
+    font-size: 12px; font-weight: 700; line-height: 21px; text-align: center;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+    background: var(--stock); color: #0C1417;
+  }
+  .badge[hidden] { display: none; }
+  .badge.next { background: var(--next); color: #1B1204; }
+  .badge.now  { background: var(--now);  color: #fff;
+                animation: throb 1.7s ease-in-out infinite; }
+  @keyframes throb { 50% { opacity: .42; } }
+  @media (prefers-reduced-motion: reduce) { .badge.now { animation: none; } }
+  .roomsel {
+    margin-left: auto; display: flex; align-items: center; gap: 8px;
+    font-size: 14px; color: var(--ink-dim);
+  }
+  .roomsel select {
+    font: 600 16px/1 inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px 10px;
+    max-width: 54vw;
+  }
+  .roomrow { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+  .roomrow select { flex: 1; max-width: none; }
+  .roomsel[hidden], .roomrow[hidden] { display: none; }
+  .locother {
+    width: 100%; min-height: 46px; margin-top: 9px; padding: 0 12px;
+    background: var(--bg); border: 1px solid var(--drape); border-radius: 8px;
+    color: var(--ink); font: 500 16px/1 inherit;
+  }
+  .locother[hidden] { display: none; }
+  main { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+
+  /* ---------- clinician ---------- */
+  .catgroup { padding: 16px 14px 4px; }
+  .catgroup h2 {
+    margin: 0 0 10px; font-size: 13px; font-weight: 600;
+    color: var(--ink-dim);
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+  .item {
+    min-height: var(--tap); padding: 10px 8px; border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--line);
+    font-size: 14px; font-weight: 500; text-align: center;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .item:active { background: var(--surface-2); transform: scale(0.97); }
+  .item.other { border-style: dashed; color: var(--ink-dim); }
+  .item.sized { position: relative; }
+  .item.sized::after {
+    content: "›"; position: absolute; top: 4px; right: 8px;
+    font-size: 15px; line-height: 1; color: var(--drape); font-weight: 700;
+  }
+  .sizes {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 8px; margin-bottom: 16px;
+  }
+  .sizes.wide { grid-template-columns: 1fr; gap: 7px; }
+  .sizes.wide .size { justify-content: flex-start; padding: 0 16px; font-size: 16px;
+                      display: flex; align-items: center; }
+  .size {
+    min-height: var(--tap); border-radius: 10px; background: var(--surface-2);
+    border: 1px solid var(--line); font-size: 17px; font-weight: 600;
+  }
+  .size:active { background: var(--drape); }
+  .iconbtn {
+    width: 40px; height: 40px; flex: 0 0 40px; border-radius: 9px;
+    background: var(--bg); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center; font-size: 17px;
+  }
+  /* Alert-sound toggle. Only appears on the tech board, where it takes the
+     right-hand slot the hospital picker uses on the clinician side. */
+  #soundBtn { position: relative; margin-left: auto; font-size: 19px; }
+  #soundBtn.on { color: var(--drape); border-color: var(--drape); }
+  #soundBtn:not(.on) { color: var(--ink-dim); }
+  #soundBtn:not(.on)::after {              /* slash through the note when muted */
+    content: ""; position: absolute; left: 7px; right: 7px; top: 50%;
+    height: 2px; border-radius: 2px; background: currentColor;
+    transform: rotate(-45deg);
+  }
+  #soundBtn[hidden] { display: none; }
+  .mineitem .x {
+    min-width: 34px; height: 34px; padding: 0 9px; border-radius: 8px;
+    background: var(--surface-2); color: var(--ink-dim);
+    font-size: 14px; font-weight: 600; flex: 0 0 auto;
+  }
+  .mineitem .x.arm { background: var(--now); color: #fff; }
+  @media (max-width: 400px) { #siteLabel { display: none; } }
+  .mine { padding: 14px; border-top: 1px solid var(--line); margin-top: 18px; }
+  .mine h2 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--ink-dim); }
+  .mineitem {
+    display: flex; align-items: center; gap: 10px; padding: 11px 12px;
+    background: var(--surface); border-radius: 10px; margin-bottom: 7px; font-size: 15px;
+  }
+  .mineitem .st { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+  .mineitem .st.ack { color: var(--drape); }
+
+  /* ---------- urgency sheet ---------- */
+  .scrim {
+    position: fixed; inset: 0; background: rgba(6,10,12,.72);
+    display: none; align-items: flex-end; z-index: 40;
+  }
+  .scrim.open { display: flex; }
+  .sheet {
+    width: 100%; background: var(--surface); border-radius: 16px 16px 0 0;
+    padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
+    animation: rise .16s ease-out;
+  }
+  @keyframes rise { from { transform: translateY(14px); } }
+  @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } .item:active { transform: none; } }
+  .sheet h3 { margin: 0 0 3px; font-size: 20px; font-weight: 700; }
+  .sheet p { margin: 0 0 16px; font-size: 14px; color: var(--ink-dim); }
+  .urg { width: 100%; min-height: 60px; border-radius: 12px; margin-bottom: 9px;
+         display: flex; align-items: center; gap: 12px; padding: 0 16px; text-align: left; }
+  .urg b { font-size: 17px; font-weight: 700; }
+  .urg span { font-size: 13px; opacity: .85; }
+  .urg.now { background: var(--now); }
+  .urg.next { background: var(--next); color: #1B1204; }
+  .urg.stock { background: var(--stock); color: #0C1417; }
+  .sheet .cancel { width: 100%; min-height: 46px; color: var(--ink-dim); font-size: 15px; }
+  .sheet input {
+    width: 100%; min-height: var(--tap); margin-bottom: 14px; padding: 0 12px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+    color: var(--ink); font: inherit;
+  }
+
+  /* ---------- tech board ---------- */
+  .lane { padding: 14px 14px 2px; }
+  .lanehead { display: flex; align-items: baseline; gap: 9px; margin-bottom: 10px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .lanehead h2 { margin: 0; font-size: 15px; font-weight: 700; }
+  .lanehead .ct { margin-left: auto; font-size: 14px; color: var(--ink-dim); font-weight: 600; }
+  /* One card per room per lane. Collapsed it is a scanning row; the actions
+     only exist once a tech has picked the card, so nothing destructive sits
+     under a thumb that is scrolling a long board. */
+  .req {
+    background: var(--surface); border-radius: 12px; margin-bottom: 8px;
+    border-left: 4px solid var(--line); overflow: hidden;
+  }
+  .req.now { border-left-color: var(--now); }
+  .req.next { border-left-color: var(--next); }
+  .req.stock { border-left-color: var(--stock); }
+  .req.allclaimed { opacity: .62; }
+  .hd {
+    width: 100%; display: grid; grid-template-columns: 62px 1fr 18px;
+    gap: 10px; align-items: center; padding: 10px 12px; text-align: left;
+  }
+  .hd:active { background: var(--surface-2); }
+  .room { text-align: center; position: relative; }
+  .room .n { display: block; font-size: 25px; font-weight: 700; line-height: 1; }
+  .room .n.long { font-size: 18px; word-break: break-word; }
+  .room .l { font-size: 10px; color: var(--ink-dim); font-weight: 600; }
+  /* How many requests are stacked on this room. Same shape as the tab badge,
+     tinted to the lane, so "more than one" reads without being read. */
+  .gcount {
+    position: absolute; top: -4px; right: -3px;
+    min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px;
+    font-size: 11px; font-weight: 700; line-height: 19px; text-align: center;
+  }
+  .req.now   .gcount { background: var(--now);   color: #fff; }
+  .req.next  .gcount { background: var(--next);  color: #1B1204; }
+  .req.stock .gcount { background: var(--stock); color: #0C1417; }
+  .col { min-width: 0; }
+  .what {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; font-size: 15px; font-weight: 600; line-height: 1.3;
+  }
+  .meta { display: block; font-size: 12px; color: var(--ink-dim); margin-top: 3px; }
+  .cv { font-size: 13px; color: var(--ink-dim); text-align: center; line-height: 1; }
+  .detail { border-top: 1px solid var(--line); padding: 4px 12px 10px; }
+  .gacts { display: flex; gap: 7px; flex-wrap: wrap; margin: 10px 0 2px; }
+  .irow {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 9px 0; border-top: 1px solid var(--surface-2);
+  }
+  .iname { flex: 1; min-width: 116px; font-size: 14.5px; font-weight: 600; }
+  .iname small {
+    display: block; font-size: 11.5px; font-weight: 500;
+    color: var(--ink-dim); margin-top: 1px;
+  }
+  .detail button {
+    min-height: 42px; padding: 0 13px; border-radius: 9px;
+    background: var(--surface-2); font-size: 13.5px; font-weight: 600;
+  }
+  .detail button.go { background: var(--drape); color: #fff; }
+  .detail button.no { background: none; color: var(--ink-dim); }
+  .detail button.wide { flex: 1; }
+  .empty { padding: 44px 24px; text-align: center; color: var(--ink-dim); font-size: 15px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+    background: var(--drape); color: #fff; padding: 12px 20px; border-radius: 999px;
+    font-size: 15px; font-weight: 600; z-index: 60; opacity: 0; pointer-events: none;
+    transition: opacity .2s;
+  }
+  .toast.show { opacity: 1; }
+  button:focus-visible, select:focus-visible, input:focus-visible {
+    outline: 2px solid #7FD3C8; outline-offset: 2px;
+  }
+</style>
+
+<header>
+  <div class="bar">
+    <div class="roles" role="group" aria-label="View">
+      <button id="rClin" aria-pressed="true">Request</button>
+      <button id="rTech" aria-pressed="false">Tech board<span class="badge" id="techBadge" aria-live="polite" hidden></span></button>
+    </div>
+    <label class="roomsel" id="siteWrap">
+      <span id="siteLabel">Hospital</span>
+      <select id="siteSel" aria-label="Hospital"></select>
+    </label>
+    <button class="iconbtn" id="soundBtn" hidden aria-pressed="false"
+            aria-label="Alert sound">&#9834;</button>
+    <button class="iconbtn" id="themeBtn" aria-label="Switch between light and dark"></button>
+  </div>
+  <label class="roomsel roomrow" id="zoneWrap" hidden>
+    <span>Covering</span>
+    <select id="zoneSel" aria-label="Coverage area"></select>
+  </label>
+  <label class="roomsel roomrow" id="roomWrap">
+    <span id="roomLabel">Location</span>
+    <select id="loc" aria-label="Room"></select>
+  </label>
+  <input id="locOther" class="locother" hidden autocomplete="off"
+         aria-label="Name the location" placeholder="Name the location">
+</header>
+
+<main id="main"></main>
+<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* =====================================================================
+   STEP 4 — paste your two values here.
+
+   SUPABASE_URL   Project Settings -> Data API -> Project URL
+                  Looks like https://abcdefghijklmnop.supabase.co
+
+   SUPABASE_KEY   Project Settings -> API Keys
+                  Use the PUBLISHABLE key (starts sb_publishable_).
+                  Older projects: the ANON key on the Legacy API Keys tab.
+                  Never paste a key labelled secret or service_role —
+                  those bypass row level security and must stay on a server.
+   ===================================================================== */
+const SUPABASE_URL      = "https://cjhctlysgrkvzmtgthoe.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_zKeg_UDpF9H30Ln2DJQ3iQ_Oyazmn_W";
+
+/* =====================================================================
+   LOCATIONS — the only block you need to edit to add rooms or sites.
+   Shape: site  ->  areas (sublocations)  ->  rooms
+   Every area automatically gets an "Other" option with free text.
+   ===================================================================== */
+const rangeRooms = (from, to) =>
+  Array.from({ length: to - from + 1 }, (_, i) => "Room " + (from + i));
+
+const SITES = [
+  {
+    id: "MAIN", name: "Main Hospital", short: "Main",
+    areas: [
+      { id: "OR",   name: "Main OR",   rooms: rangeRooms(2, 25) },
+      { id: "ENDO", name: "Main Endo", rooms: rangeRooms(1, 3) },
+      { id: "NIR",  name: "NIR",       rooms: rangeRooms(1, 3) },
+      { id: "RAD",  name: "Radiology", rooms: ["CT", "MRI", "IR 1", "IR 2"] },
+      { id: "CVOR", name: "CV OR",     rooms: rangeRooms(1, 12) },
+      { id: "CATH", name: "Cath Lab",  rooms: rangeRooms(1, 11) }
+    ]
+  },
+  {
+    // No sublocations — rooms sit directly under the hospital.
+    id: "MCNAIR", name: "McNair Hospital", short: "McNair",
+    areas: [
+      { id: "OR", name: "McNair OR", flat: true, rooms: rangeRooms(1, 7) }
+    ]
+  },
+  {
+    id: "OTM", name: "OTM Hospital", short: "OTM",
+    areas: [
+      { id: "OR",   name: "OTM OR",   rooms: rangeRooms(1, 6), todo: true },
+      { id: "ENDO", name: "OTM Endo", rooms: rangeRooms(1, 3), todo: true },
+      { id: "IR",   name: "OTM IR",   rooms: rangeRooms(1, 2), todo: true }
+    ]
+  },
+  {
+    id: "JAMAIL", name: "Jamail ASC", short: "Jamail",
+    areas: [
+      { id: "OR",   name: "Jamail OR",         rooms: rangeRooms(1, 6), todo: true },
+      { id: "PROC", name: "Jamail Procedures", rooms: rangeRooms(1, 2), todo: true }
+    ]
+  }
+];
+
+/* =====================================================================
+   COVERAGE ZONES — how the tech board is split up for assigned techs.
+   A zone groups (site, area) pairs, so it can cut across a hospital:
+   CV lives inside Main Hospital but gets its own zone.
+
+   `covers` maps a site id to either "*" (every area in that site)
+   or a list of area ids from the SITES block above.
+   To reassign a room, move its area id between zones here.
+   ===================================================================== */
+const ZONES = [
+  { id: "ALL", name: "All areas" },
+  { id: "MAIN_GEN", name: "Main OR / General",
+    covers: { MAIN: ["OR", "ENDO", "NIR", "RAD"] } },
+  { id: "CV", name: "CV — CV OR + Cath Lab",
+    covers: { MAIN: ["CVOR", "CATH"] } },
+  { id: "MCNAIR", name: "McNair OR",
+    covers: { MCNAIR: "*" } },
+  { id: "OTM", name: "OTM — OR, Endo, IR",
+    covers: { OTM: "*" } },
+  { id: "JAMAIL", name: "Jamail ASC",
+    covers: { JAMAIL: "*" } }
+];
+
+const zone = id => ZONES.find(z => z.id === id) || ZONES[0];
+// Does one request belong in the given zone? "ALL" has no `covers` and takes everything.
+const inZone = (zid, r) => {
+  const z = zone(zid);
+  if (!z.covers) return true;
+  const areas = z.covers[r.site];
+  if (!areas) return false;
+  return areas === "*" || areas.includes(r.area);
+};
+// True when a zone spans more than one hospital, so the board prints the site name.
+const zoneSpansSites = zid => Object.keys(zone(zid).covers || {}).length !== 1;
+
+const OTHER = "Other";
+const site     = id => SITES.find(s => s.id === id) || SITES[0];
+const areaOf   = (sid, aid) => site(sid).areas.find(a => a.id === aid) || site(sid).areas[0];
+const siteName = id => site(id).name;
+const areaName = (sid, aid) => areaOf(sid, aid).name;
+// "Room 12" reads as "12" on the board; "MRI" and "NIR 1" stay as they are.
+const shortRoom = r => r.replace(/^Room /, "");
+
+/* Catalog. An entry is either a plain name, or an object with `variants`
+   which opens a size step before the urgency step.
+   `short` is what fits on the button; `label` is what the tech reads. */
+const CATALOG = {
+  "Airway": [
+    { label: "Regular ETT", short: "Regular ETT", variants: ["5", "6", "7", "8"] },
+    { label: "Wire-reinforced ETT", short: "Wire ETT", variants: ["5", "6", "7", "8"] },
+    { label: "MLT", variants: ["4.0", "5.0", "6.0"] },
+    { label: "DLT", variants: ["35F", "37F", "39F"] },
+    "Bronchial blocker",
+    { label: "LMA", variants: ["3", "4", "5"] },
+    "NIMS ETT", "Laser ETT"
+  ],
+  "Intubation equipment": [
+    { label: "Mac", variants: ["3", "4"] },
+    { label: "Miller", variants: ["2", "3"] },
+    { label: "Video Laryngoscope", variants: ["3 blade", "4 blade", "D-blade"] },
+    "Fiberoptic bronchoscope",
+    "Bougie", "Stylet", "Magill forceps",
+    { label: "OPA", variants: ["80 mm", "90 mm"] },
+    { label: "NPA", variants: ["20F", "30F", "34F"] },
+    "LTA"
+  ],
+  "Ventilator & circuit": [
+    "Circuit extension", "Adult circuit", "Water trap",
+    "CO2 sampler line", "CO2 absorbent",
+    "Suction tubing", "Yankauer", "Soft suction catheter",
+    "Sevoflurane"
+  ],
+  "Lines & access": [
+    { label: "IV", variants: ["24G", "22G", "20G", "18G", "16G", "14G"] },
+    "A-line kit",
+    { label: "Central line kit", short: "Central line",
+      variants: ["7Fr 2 lumen", "7Fr 3 lumen", "9Fr MAC catheter", "9Fr introducer"] },
+    "PA catheter", "Companion catheter", "Wire",
+    { label: "Pressure bag", variants: ["500cc", "1L"] },
+    { label: "IV tubing", variants: ["Standard", "Secondary", "Micro-bore", "Pressure tubing", "IV extension"] },
+    "Blood infusion set", "Belmont RIS",
+    "Ultrasound"
+  ],
+  "Monitors": [
+    "BIS", "Nerve stimulator", "Temp probe", "Cerebral ox", "Extra NIBP cuff",
+    "Art line", "CVP monitoring", "Continuous CO", "Vigileo", "TEE"
+  ],
+  "Warming": ["Bair Hugger","Warm blankets","Fluid warmer"],
+  "Room supplies": [
+    { label: "Syringe", variants: ["1cc", "3cc", "5cc", "10cc", "20cc", "30cc", "50cc", "60cc"] },
+    { label: "Tape", variants: ["Pink", "Paper", "Plastic", "Silk"] },
+    { label: "Tegaderm", variants: ["Small", "CHG"] },
+    "Gauze", "Art line brace"
+  ]
+};
+
+// label -> sizes, for everything in the catalog that has a size step.
+const VARIANTS = {};
+Object.values(CATALOG).flat().forEach(e => {
+  if (e && e.variants) VARIANTS[e.label] = e.variants;
+});
+
+const LANES = [
+  { id: "now",   label: "Need now",   sub: "Bring it to the room",       color: "var(--now)" },
+  { id: "next",  label: "Next case",  sub: "Have it set before turnover", color: "var(--next)" },
+  { id: "stock", label: "Restock",    sub: "Whenever you make rounds",    color: "var(--stock)" }
+];
+
+let state = {
+  // Reopen where this phone left off: a tech's device lands on the board,
+  // a clinician's on the catalog. Tapping either tab resets the default.
+  role: localStorage.getItem("or-role") === "tech" ? "tech" : "clin",
+  site: localStorage.getItem("or-site") || "MAIN",
+  area: localStorage.getItem("or-area") || "OR",
+  room: localStorage.getItem("or-room") || "Room 2",
+  other: localStorage.getItem("or-other") || "",
+  // Tech board coverage zone. New key, so anyone carrying the old
+  // per-hospital value lands on "All areas" rather than a zone that
+  // would quietly hide rooms they were watching yesterday.
+  filter: localStorage.getItem("or-zone") || "ALL",
+  armed: null,                                           // request awaiting cancel confirmation
+  // Which room card is expanded on the tech board. Lives in state rather than
+  // in the DOM because every refresh rebuilds the board from scratch, and a
+  // teammate's write 30 seconds in must not fold the card under someone's thumb.
+  openCard: null,
+  reqs: [], loaded: false
+};
+let armTimer;
+/* Phones that have never opened the tech board are clinician phones, and a
+   count of requests they didn't send is just noise there. Set on first use. */
+let usedTech = localStorage.getItem("or-usedtech") === "1";
+// What the clinician sees, and what prints on the tech board.
+const isFlat = sid => site(sid).areas.length === 1 && site(sid).areas[0].flat;
+const roomLabel = () => state.room === OTHER ? (state.other || "Unnamed") : state.room;
+const whereLabel = () => isFlat(state.site)
+  ? siteName(state.site) + " · " + roomLabel()
+  : siteName(state.site) + " · " + areaName(state.site, state.area) + " · " + roomLabel();
+// Small tag printed under the room number on the tech board.
+const areaTag = (sid, aid) => isFlat(sid) ? site(sid).short : areaOf(sid, aid).id;
+let me = localStorage.getItem("or-me") || (localStorage.setItem("or-me", "u" + Math.random().toString(36).slice(2, 7)), localStorage.getItem("or-me"));
+
+/* ---------- Supabase ---------- */
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// DB row -> the shape the rest of the app already expects.
+const fromRow = r => ({
+  id: r.id, site: r.site, area: r.area, room: r.room, item: r.item,
+  urgency: r.urgency, status: r.status, by: r.requester, tech: r.tech,
+  at: new Date(r.created_at).getTime()
+});
+
+async function load() {
+  const since = new Date(Date.now() - 12 * 3600e3).toISOString();
+  const { data, error } = await sb.from("requests")
+    .select("*").gte("created_at", since).order("created_at");
+  if (error) { toast("Offline — retrying"); state.loaded = true; return; }
+  state.reqs = data.map(fromRow);
+  state.loaded = true;
+}
+
+async function sendRequest(row) {
+  const { error } = await sb.from("requests").insert(row);
+  if (error) { toast("Not sent — try again"); return false; }
+  return true;
+}
+
+async function setStatus(id, patch) {
+  const { error } = await sb.from("requests").update(patch).eq("id", id);
+  if (error) { toast("Not saved — try again"); return false; }
+  return true;
+}
+
+// Group actions touch several rows at once; one request beats a loop of them.
+async function setStatusMany(ids, patch) {
+  const { error } = await sb.from("requests").update(patch).in("id", ids);
+  if (error) { toast("Not saved — try again"); return false; }
+  return true;
+}
+
+/* ---------- helpers ---------- */
+const ago = t => {
+  const m = Math.floor((Date.now() - t) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return m + " min ago";
+  return Math.floor(m / 60) + " hr ago";
+};
+let tTimer;
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.classList.add("show");
+  clearTimeout(tTimer); tTimer = setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+/* ---------- alert sound ----------
+   Tones are synthesised with Web Audio, so the app stays one file with
+   nothing to download and nothing to cache. Three things are worth knowing
+   before anyone treats this as a pager:
+
+   1. A browser will not play audio until the user has tapped the page. The
+      tech taps the note button once; that tap unlocks audio AND plays a test
+      blip, so they find out then and there whether they can hear it.
+   2. On iPhone the hardware silent switch mutes this. A tech with the ringer
+      off hears nothing, so the badge and the board stay the real backstop.
+   3. It only fires while the tech board is the open view on this device. A
+      clinician's phone never beeps for requests it didn't send.
+
+   Restock makes no sound on purpose — it is a "whenever you make rounds"
+   lane, and beeping for it is how alarm fatigue starts. Give TONES a `stock`
+   entry if that turns out to be wrong in practice. */
+let audioCtx = null;
+let soundOn = localStorage.getItem("or-sound") === "1";
+const seen = new Set();      // request ids this device has already reacted to
+let primed = false;          // the first load is the standing board, not news
+
+const TONES = {
+  now:  { freq: 988, times: 3, gap: 0.17, dur: 0.12, peak: 0.30 },
+  next: { freq: 740, times: 2, gap: 0.22, dur: 0.16, peak: 0.18 }
+};
+
+function audio() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;                        // very old browser; stay silent
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+/* One sine blip with softened edges. A hard start and stop clicks audibly
+   on phone speakers, which reads as a fault rather than an alert. */
+function blip(ctx, freq, at, dur, peak) {
+  const osc = ctx.createOscillator();
+  const amp = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(freq, at);
+  amp.gain.setValueAtTime(0.0001, at);
+  amp.gain.exponentialRampToValueAtTime(peak, at + 0.012);
+  amp.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  osc.connect(amp).connect(ctx.destination);
+  osc.start(at);
+  osc.stop(at + dur + 0.03);
+}
+
+function playTone(kind) {
+  const t = TONES[kind];
+  if (!t) return;
+  const ctx = audio();
+  if (!ctx) return;
+  for (let i = 0; i < t.times; i++) {
+    blip(ctx, t.freq, ctx.currentTime + 0.02 + i * t.gap, t.dur, t.peak);
+  }
+}
+
+/* Compare what just came back against what this device already knew.
+   Everything fetched is marked seen, including requests outside the current
+   zone, so switching coverage never sets off a burst of beeps for requests
+   that have been sitting there for an hour. One tone per refresh, pitched to
+   the most urgent arrival, so a batch after a dropped connection is one
+   alert rather than nine. */
+function alertOnNew() {
+  const fresh = state.reqs.filter(r => !seen.has(r.id));
+  state.reqs.forEach(r => seen.add(r.id));
+  if (seen.size > 3000) {                        // long shift; keep the set bounded
+    seen.clear();
+    state.reqs.forEach(r => seen.add(r.id));
+  }
+
+  if (!primed) { primed = true; return; }        // opening the app is not an event
+  if (!soundOn || state.role !== "tech") return;
+
+  const waiting = fresh.filter(r => r.status === "open" && inZone(state.filter, r));
+  if (!waiting.length) return;
+  const top = LANES.find(l => waiting.some(r => r.urgency === l.id));
+  if (top && TONES[top.id]) playTone(top.id);    // a lane with no TONES entry stays silent
+}
+
+const soundBtn = document.getElementById("soundBtn");
+function paintSound() {
+  soundBtn.hidden = state.role !== "tech";
+  soundBtn.classList.toggle("on", soundOn);
+  soundBtn.setAttribute("aria-pressed", String(soundOn));
+  soundBtn.setAttribute("aria-label",
+    soundOn ? "Alert sound on, tap to mute" : "Alert sound off, tap to turn on");
+}
+soundBtn.onclick = () => {
+  soundOn = !soundOn;
+  localStorage.setItem("or-sound", soundOn ? "1" : "0");
+  paintSound();
+  if (soundOn) { playTone("next"); toast("Alert sound on"); }
+  else toast("Alert sound off");
+};
+
+/* A saved preference cannot start audio by itself — the browser still wants a
+   gesture. The tech's first tap anywhere pays that toll, usually the tap that
+   opened the board. */
+function primeAudio() {
+  if (soundOn) audio();
+  if (audioCtx && audioCtx.state === "running") {
+    ["pointerdown", "keydown"].forEach(t =>
+      document.removeEventListener(t, primeAudio, true));
+  }
+}
+["pointerdown", "keydown"].forEach(t =>
+  document.addEventListener(t, primeAudio, true));
+
+/* ---------- size step ---------- */
+function openSizes(label) {
+  const s = document.getElementById("sheet");
+  const opts = VARIANTS[label];
+  const wide = opts.some(v => v.length > 8);   // wordy options read better as rows
+  s.innerHTML = `
+    <h3>${label}</h3>
+    <p>Which ${wide ? "one" : "size"}?</p>
+    <div class="sizes ${wide ? "wide" : ""}">
+      ${opts.map(v => `<button class="size" data-size="${v}">${v}</button>`).join("")}
+    </div>
+    <button class="cancel" data-cancel="1">Cancel</button>`;
+  document.getElementById("scrim").classList.add("open");
+
+  s.onclick = ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.cancel) return closeSheet();
+    if (b.dataset.size) openSizes.pick(label, b.dataset.size);
+  };
+}
+openSizes.pick = (label, size) => openSheet(label + " " + size, false);
+
+/* ---------- request sheet ---------- */
+function openSheet(item, custom) {
+  const s = document.getElementById("sheet");
+  s.innerHTML = `
+    <h3>${custom ? "Something else" : item}</h3>
+    <p>${whereLabel()}. How soon do you need it?</p>
+    ${custom ? '<input id="freeText" placeholder="What do you need?" autocomplete="off">' : ""}
+    ${LANES.map(l => `<button class="urg ${l.id}" data-u="${l.id}">
+        <b>${l.label}</b><span>${l.sub}</span></button>`).join("")}
+    <button class="cancel" data-u="">Cancel</button>`;
+  document.getElementById("scrim").classList.add("open");
+  if (custom) setTimeout(() => document.getElementById("freeText").focus(), 60);
+
+  s.onclick = async ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    const u = b.dataset.u;
+    if (!u) { closeSheet(); return; }
+    let what = item;
+    if (custom) {
+      what = document.getElementById("freeText").value.trim();
+      if (!what) { toast("Type what you need"); return; }
+    }
+    if (state.room === OTHER && !state.other) {
+      closeSheet();
+      document.getElementById("locOther").focus();
+      toast("Name the location first");
+      return;
+    }
+    closeSheet();
+    const ok = await sendRequest({
+      site: state.site, area: state.area, room: roomLabel(),
+      item: what, urgency: u, requester: me, status: "open"
+    });
+    if (ok) toast(u === "now" ? "Sent — techs alerted" : "Sent to the board");
+    await refresh();
+  };
+}
+function closeSheet() { document.getElementById("scrim").classList.remove("open"); }
+document.getElementById("scrim").onclick = e => { if (e.target.id === "scrim") closeSheet(); };
+
+/* ---------- views ---------- */
+function clinicianView() {
+  const mine = state.reqs
+    .filter(r => r.by === me && !["done", "cancelled"].includes(r.status)
+                 && Date.now() - r.at < 6 * 3600e3)
+    .sort((a, b) => b.at - a.at);
+
+  return Object.entries(CATALOG).map(([cat, items]) => `
+    <section class="catgroup">
+      <h2>${cat}</h2>
+      <div class="grid">
+        ${items.map(e => {
+          const label = typeof e === "string" ? e : e.label;
+          const face  = typeof e === "string" ? e : (e.short || e.label);
+          const sized = !!VARIANTS[label];
+          return `<button class="item ${sized ? "sized" : ""}" data-item="${label}">${face}</button>`;
+        }).join("")}
+        ${cat === "Room supplies" ? '<button class="item other" data-custom="1">Something else</button>' : ""}
+      </div>
+    </section>`).join("")
+    + (mine.length ? `<section class="mine"><h2>Your open requests</h2>${mine.map(r => `
+        <div class="mineitem">
+          <span class="dot" style="background:${LANES.find(l => l.id === r.urgency).color}"></span>
+          <span>${site(r.site).short} ${areaTag(r.site, r.area)} ${shortRoom(r.room)} · ${r.item}</span>
+          <span class="st ${r.status === "claimed" ? "ack" : ""}">${
+            r.status === "claimed" ? "Tech on it" : r.status === "blocked" ? "Not available" : "Waiting"
+          }</span>
+          <button class="x ${state.armed === r.id ? "arm" : ""}" data-del="${r.id}"
+                  aria-label="Cancel this request">${state.armed === r.id ? "Cancel it" : "✕"}</button>
+        </div>`).join("")}</section>` : "");
+}
+
+/* One card per room per lane. Urgency stays the top-level split, so a Need-now
+   and a Restock from the same room do not merge — those are different trips on
+   different clocks, and burying an urgent item inside a restock card would be
+   the wrong kind of tidy. A room can therefore appear in two lanes at once.
+
+   Rooms are matched case-insensitively so a free-text "hallway" and "Hallway"
+   land on the same card rather than sitting next to each other. */
+const groupKey = r =>
+  [r.urgency, r.site, r.area, r.room.trim().toLowerCase()].join("|");
+
+function groupByRoom(rs) {
+  const map = new Map();
+  rs.forEach(r => {
+    const k = groupKey(r);
+    if (!map.has(k)) {
+      map.set(k, { key: k, room: r.room, site: r.site, area: r.area, items: [] });
+    }
+    map.get(k).items.push(r);
+  });
+  const groups = [...map.values()];
+  groups.forEach(g => {
+    g.items.sort((a, b) => a.at - b.at);
+    g.at = g.items[0].at;                    // a room is as old as its oldest ask
+  });
+  return groups.sort((a, b) => a.at - b.at);
+}
+
+const idList = rs => rs.map(r => r.id).join(",");
+
+function roomCard(g, lane) {
+  const isOpen  = state.openCard === g.key;
+  const claimed = g.items.filter(r => r.status === "claimed");
+  const unheld  = g.items.filter(r => r.status === "open");
+  const n = g.items.length;
+  const allClaimed = claimed.length === n;
+
+  const bits = [];
+  if (zoneSpansSites(state.filter)) bits.push(site(g.site).short);
+  if (claimed.length) {
+    const mine = claimed.every(r => r.tech === me);
+    bits.push(allClaimed
+      ? (mine ? "claimed by you" : "claimed")
+      : claimed.length + " claimed" + (mine ? " by you" : ""));
+  }
+  bits.push((n > 1 ? "oldest " : "") + ago(g.at));
+
+  /* Claiming only ever takes the unclaimed items. Sweeping up a request a
+     teammate already claimed would pull it out from under them silently. */
+  const gacts = [];
+  if (unheld.length) {
+    const label = unheld.length === n
+      ? (n > 1 ? "Claim all " + n : "Claim")
+      : "Claim remaining " + unheld.length;
+    gacts.push(`<button class="go wide" data-gact="claim" data-ids="${idList(unheld)}">${label}</button>`);
+  }
+  if (n > 1) {
+    gacts.push(`<button class="${unheld.length ? "" : "go wide"}" data-gact="done" data-ids="${idList(g.items)}">Delivered all</button>`);
+  }
+
+  const detail = !isOpen ? "" : `<div class="detail">
+      ${gacts.length ? `<div class="gacts">${gacts.join("")}</div>` : ""}
+      ${g.items.map(r => `
+        <div class="irow">
+          <span class="iname">${r.item}<small>${
+            r.status === "claimed" ? "claimed by " + (r.tech === me ? "you" : r.tech) + " · " : ""
+          }${ago(r.at)}</small></span>
+          <button class="go" data-act="done" data-id="${r.id}">Delivered</button>
+          <button class="no" data-act="blocked" data-id="${r.id}">Can't fill</button>
+        </div>`).join("")}
+    </div>`;
+
+  return `<article class="req ${lane.id} ${allClaimed ? "allclaimed" : ""}">
+      <button class="hd" data-card="${g.key}" aria-expanded="${isOpen}"
+              aria-label="${shortRoom(g.room)}, ${n} request${n === 1 ? "" : "s"}">
+        <span class="room">
+          <span class="n num ${shortRoom(g.room).length > 3 ? "long" : ""}">${shortRoom(g.room)}</span>
+          <span class="l">${areaTag(g.site, g.area)}</span>
+          ${n > 1 ? `<span class="gcount num">${n}</span>` : ""}
+        </span>
+        <span class="col">
+          <span class="what">${g.items.map(r => r.item).join(" · ")}</span>
+          <span class="meta">${bits.join(" · ")}</span>
+        </span>
+        <span class="cv">${isOpen ? "▲" : "▼"}</span>
+      </button>
+      ${detail}
+    </article>`;
+}
+
+function techView() {
+  const live = state.reqs.filter(r => r.status === "open" || r.status === "claimed");
+  const open = live.filter(r => inZone(state.filter, r));
+
+  if (!open.length) {
+    const elsewhere = live.length - open.length;
+    return `<div class="empty">Board is clear${state.filter === "ALL" ? "" : " in " + zone(state.filter).name}.<br>
+      ${elsewhere ? elsewhere + (elsewhere === 1 ? " request is" : " requests are") +
+                    " open outside your area — switch to All areas to see them."
+                  : "New requests land here as soon as they're sent."}</div>`;
+  }
+
+  return LANES.map(l => {
+    const rs = open.filter(r => r.urgency === l.id);
+    if (!rs.length) return "";
+    const groups = groupByRoom(rs);
+    // Items and rooms are different numbers once requests stack up, and the
+    // room count is the one that predicts how many trips this lane is worth.
+    const count = groups.length < rs.length
+      ? `${rs.length} items · ${groups.length} rooms`
+      : String(rs.length);
+    return `<section class="lane">
+      <div class="lanehead">
+        <span class="dot" style="background:${l.color}"></span>
+        <h2>${l.label}</h2><span class="ct num">${count}</span>
+      </div>
+      ${groups.map(g => roomCard(g, l)).join("")}
+    </section>`;
+  }).join("");
+}
+
+/* Badge on the Tech board tab. Counts unclaimed requests in the selected
+   zone, so it reads as "needs a tech" rather than "work outstanding" —
+   claiming one drops the number. LANES runs now -> next -> stock, so the
+   first lane with anything waiting is the most urgent. */
+function paintBadge() {
+  const el = document.getElementById("techBadge");
+  const waiting = state.reqs.filter(r => r.status === "open" && inZone(state.filter, r));
+
+  if (!usedTech || !waiting.length) { el.hidden = true; el.textContent = ""; return; }
+
+  const top = LANES.find(l => waiting.some(r => r.urgency === l.id));
+  el.hidden = false;
+  el.className = "badge " + top.id;
+  el.textContent = waiting.length > 99 ? "99+" : waiting.length;
+  el.setAttribute("aria-label",
+    `${waiting.length} request${waiting.length === 1 ? "" : "s"} waiting, most urgent: ${top.label}`);
+}
+
+function render() {
+  const m = document.getElementById("main");
+  document.getElementById("rClin").setAttribute("aria-pressed", state.role === "clin");
+  document.getElementById("rTech").setAttribute("aria-pressed", state.role === "tech");
+  const clin = state.role === "clin";
+  document.getElementById("siteWrap").hidden = !clin;
+  document.getElementById("roomWrap").hidden = !clin;
+  document.getElementById("zoneWrap").hidden = clin;
+  document.getElementById("locOther").hidden = !clin || state.room !== OTHER;
+  buildSites(); buildZones();
+  paintBadge();                          // painted even while the board is still loading
+  paintSound();
+  if (!state.loaded) { m.innerHTML = `<div class="empty">Loading the board…</div>`; return; }
+  m.innerHTML = state.role === "clin" ? clinicianView() : techView();
+}
+
+/* ---------- events ---------- */
+document.getElementById("main").onclick = async ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+
+  // Accordion: opening one room card closes the other, so the board stays short.
+  if (b.dataset.card) {
+    state.openCard = state.openCard === b.dataset.card ? null : b.dataset.card;
+    render();
+    return;
+  }
+  if (b.dataset.gact) {
+    const ids = b.dataset.ids.split(",").filter(Boolean);
+    const now = new Date().toISOString();
+    const patch = b.dataset.gact === "claim"
+      ? { status: "claimed", tech: me, claimed_at: now }
+      : { status: "done", resolved_at: now };
+    if (await setStatusMany(ids, patch)) {
+      toast(b.dataset.gact === "claim"
+        ? (ids.length > 1 ? "Claimed " + ids.length + " items" : "Claimed")
+        : (ids.length > 1 ? "Marked " + ids.length + " delivered" : "Marked delivered"));
+    }
+    await refresh();
+    return;
+  }
+  if (b.dataset.del) {                       // first tap arms, second tap cancels
+    if (state.armed !== b.dataset.del) {
+      state.armed = b.dataset.del;
+      render();
+      clearTimeout(armTimer);
+      armTimer = setTimeout(() => { state.armed = null; render(); }, 4000);
+      return;
+    }
+    clearTimeout(armTimer); state.armed = null;
+    const r = state.reqs.find(x => x.id === b.dataset.del);
+    const wasClaimed = r && r.status === "claimed";
+    const ok = await setStatus(b.dataset.del,
+      { status: "cancelled", resolved_at: new Date().toISOString() });
+    if (ok) toast(wasClaimed ? "Cancelled — tell the tech, they were on it" : "Request cancelled");
+    await refresh();
+    return;
+  }
+  if (b.dataset.item) {
+    return VARIANTS[b.dataset.item]
+      ? openSizes(b.dataset.item)
+      : openSheet(b.dataset.item, false);
+  }
+  if (b.dataset.custom) return openSheet("", true);
+  if (b.dataset.act) {
+    const now = new Date().toISOString();
+    const patch =
+      b.dataset.act === "claim"   ? { status: "claimed", tech: me, claimed_at: now } :
+      b.dataset.act === "done"    ? { status: "done",    resolved_at: now } :
+                                    { status: "blocked", resolved_at: now };
+    const msg =
+      b.dataset.act === "claim" ? "Claimed" :
+      b.dataset.act === "done"  ? "Marked delivered" : "Requester told it's unavailable";
+    if (await setStatus(b.dataset.id, patch)) toast(msg);
+    await refresh();
+  }
+};
+document.getElementById("rClin").onclick = () => {
+  state.role = "clin";
+  localStorage.setItem("or-role", "clin");
+  render();
+};
+document.getElementById("rTech").onclick = () => {
+  state.role = "tech";
+  localStorage.setItem("or-role", "tech");
+  if (!usedTech) { usedTech = true; localStorage.setItem("or-usedtech", "1"); }
+  refresh();
+};
+
+const siteSel = document.getElementById("siteSel");
+const zoneSel = document.getElementById("zoneSel");
+const sel = document.getElementById("loc");
+const other = document.getElementById("locOther");
+
+/* Hospital picker — clinician side only. */
+function buildSites() {
+  siteSel.innerHTML = SITES.map(s =>
+    `<option value="${s.id}" ${s.id === state.site ? "selected" : ""}>${s.name}</option>`
+  ).join("");
+}
+
+/* Coverage-zone picker — tech board only. A tech sets this once and the
+   phone remembers it, so an assigned tech never scrolls past other areas. */
+function buildZones() {
+  zoneSel.innerHTML = ZONES.map(z =>
+    `<option value="${z.id}" ${z.id === state.filter ? "selected" : ""}>${z.name}</option>`
+  ).join("");
+}
+
+/* Room picker, grouped by sublocation within the selected hospital. */
+function buildRooms() {
+  const s = site(state.site);
+  if (!s.areas.some(a => a.id === state.area)) state.area = s.areas[0].id;
+  const flat = s.areas.length === 1 && s.areas[0].flat;
+
+  const opts = a => [...a.rooms, OTHER].map(r => {
+    const on = a.id === state.area && r === state.room;
+    const text = flat ? r : a.name + " · " + r;
+    return `<option value="${a.id}|${r}" ${on ? "selected" : ""}>${text}</option>`;
+  }).join("");
+
+  sel.innerHTML = flat
+    ? opts(s.areas[0])
+    : s.areas.map(a => `
+        <optgroup label="${a.name}${a.todo ? " (rooms not confirmed)" : ""}">${opts(a)}</optgroup>`
+      ).join("");
+
+  document.getElementById("roomLabel").textContent = flat ? "Room" : "Location";
+
+  if (!sel.value) {                       // hospital changed out from under the old room
+    sel.selectedIndex = 0;
+    [state.area, state.room] = sel.value.split("|");
+    persistWhere();
+  }
+}
+
+function persistWhere() {
+  localStorage.setItem("or-site", state.site);
+  localStorage.setItem("or-area", state.area);
+  localStorage.setItem("or-room", state.room);
+}
+
+function syncOther() {
+  const isOther = state.room === OTHER;
+  other.hidden = !isOther || state.role !== "clin";
+  other.placeholder = "Name the location in " + areaName(state.site, state.area);
+  if (isOther) other.value = state.other;
+}
+
+siteSel.onchange = e => {
+  state.site = e.target.value;
+  buildRooms(); persistWhere(); syncOther();
+  render();
+};
+
+zoneSel.onchange = e => {
+  state.filter = e.target.value;
+  localStorage.setItem("or-zone", state.filter);
+  render();
+};
+
+sel.onchange = e => {
+  [state.area, state.room] = e.target.value.split("|");
+  persistWhere(); syncOther();
+  if (state.room === OTHER) other.focus();
+  render();
+};
+
+other.oninput = e => {
+  state.other = e.target.value.trim();
+  localStorage.setItem("or-other", state.other);
+};
+
+buildSites(); buildZones(); buildRooms(); syncOther();
+
+/* ---------- theme ---------- */
+const themeBtn = document.getElementById("themeBtn");
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  themeBtn.textContent = t === "light" ? "☾" : "☀";
+  localStorage.setItem("or-theme", t);
+}
+applyTheme(localStorage.getItem("or-theme") ||
+  (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"));
+themeBtn.onclick = () =>
+  applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
+
+async function refresh() { await load(); alertOnNew(); render(); }
+// Paint the remembered view immediately, or a tech's phone shows the
+// clinician header until the first fetch comes back.
+render();
+refresh();
+/* Live updates. The board changes within about a second of any write. */
+sb.channel("board")
+  .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, refresh)
+  .subscribe();
+
+// Safety net if the websocket drops, and a catch-up when the phone wakes.
+setInterval(refresh, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+</script>
