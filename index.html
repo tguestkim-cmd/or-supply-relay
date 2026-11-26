@@ -1,5 +1,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#192327">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Supply Relay">
 <title>OR Supply Relay</title>
 <style>
   :root {
@@ -459,6 +465,7 @@ const CATALOG = {
     { label: "Wire-reinforced ETT", short: "Wire ETT", variants: ["5", "6", "7", "8"] }
   ],
   "Intubation equipment": [
+    "Ambu-bag",
     "Bougie",
     "Difficult airway cart",
     "Fiberoptic bronchoscope",
@@ -483,11 +490,16 @@ const CATALOG = {
     { label: "Central line kit", short: "Central line",
       variants: ["7Fr 2 lumen", "7Fr 3 lumen", "9Fr MAC catheter", "9Fr introducer"] },
     "Companion catheter",
-    { label: "IV", variants: ["24G", "22G", "20G", "18G", "16G", "14G"] },
+    "Micro-puncture kit",
+    { label: "Ped central line kit", short: "Ped central line", variants: ["20G", "16G"] },
+    { label: "IV Angiocath", variants: ["24G", "22G", "20G", "18G", "16G", "14G"] },
+    "IV pump",
+    // Quantity, not a channel number: "IV pump channel × 2" means bring two.
+    { label: "IV pump channel", ask: "How many?", variants: ["× 1", "× 2", "× 3", "× 4"] },
     { label: "IV tubing", variants: ["Standard", "Secondary", "Micro-bore", "Pressure tubing", "IV extension"] },
     "PA catheter",
     { label: "Pressure bag", variants: ["500cc", "1L"] },
-    "Ultrasound", "Wire"
+    "Syringe pump", "Ultrasound", "Wire"
   ],
   "Monitors": [
     "Art line",
@@ -495,13 +507,15 @@ const CATALOG = {
     "Cerebral ox", "Continuous CO", "CVP monitoring",
     "Extra NIBP cuff", "Nerve stimulator", "TEE", "Temp probe", "Vigileo"
   ],
-  "Warming": ["Bair Hugger", "Fluid warmer", "Warm blankets"],
+  "Warming/cooling": ["Bair Hugger", "Fluid warmer", "Ice bags", "Warm blankets"],
   "Room supplies": [
     "ABG syringe", "Alcohol wipes", "Art line brace",
     { label: "BP cuff", variants: ["Small adult", "Standard adult", "Large adult"] },
     "EKG pads",
     { label: "Esophageal temp probe", short: "Esoph temp" },
-    "Gauze", "IV cap", "Manifold",
+    "Gauze", "IV valve cap", "Manifold",
+    "Rubber syringe cap",
+    { label: "Sterile gloves", variants: ["6.0", "6.5", "7.0", "7.5", "8.0", "8.5"] },
     { label: "Needle", variants: ["25G", "18G"] },
     { label: "Pulse ox probe", short: "Pulse ox", variants: ["Finger probe", "Ear probe"] },
     { label: "Salem sump", variants: ["12Fr", "14Fr", "16Fr", "18Fr"] },
@@ -532,8 +546,10 @@ const byFace = (a, b) =>
 
 // label -> sizes, for everything in the catalog that has a size step.
 const VARIANTS = {};
+const ASK = {};            // optional prompt for the size sheet, e.g. "How many?"
 Object.values(CATALOG).flat().forEach(e => {
   if (e && e.variants) VARIANTS[e.label] = e.variants;
+  if (e && e.ask) ASK[e.label] = e.ask;
 });
 
 const LANES = [
@@ -762,7 +778,7 @@ function openSizes(label) {
   const wide = opts.some(v => v.length > 8);   // wordy options read better as rows
   s.innerHTML = `
     <h3>${label}</h3>
-    <p>Which ${wide ? "one" : "size"}?</p>
+    <p>${ASK[label] || (wide ? "Which one?" : "Which size?")}</p>
     <div class="sizes ${wide ? "wide" : ""}">
       ${opts.map(v => `<button class="size" data-size="${v}">${v}</button>`).join("")}
     </div>
@@ -1284,3 +1300,4 @@ sb.channel("board")
 setInterval(refresh, 30000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 </script>
+<script src="push.js?v=1"></script>
