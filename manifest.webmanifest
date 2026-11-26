@@ -1,0 +1,14 @@
+{
+  "name": "OR Supply Relay",
+  "short_name": "Supply Relay",
+  "description": "Anesthesia supply requests between providers and techs",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101619",
+  "theme_color": "#192327",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
